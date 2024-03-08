@@ -5,7 +5,6 @@ import { pdfjs } from "react-pdf";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
-// Fix: Doesn't work if object's size changes
 const keepInCanvas = (
   obj: fabric.Object,
   maxWidth: number,
@@ -14,15 +13,15 @@ const keepInCanvas = (
   if (obj) {
     const left = obj.left as number;
     const top = obj.top as number;
-    const width = obj.width as number;
-    const height = obj.height as number;
+    const width = obj.getScaledWidth() as number;
+    const height = obj.getScaledHeight() as number;
 
     // Check if the object is going out of canvas boundaries
     if (left < 0) {
-      obj.left = 0;
+      obj.left = 1;
     }
     if (top < 0) {
-      obj.top = 0;
+      obj.top = 1;
     }
     // -1 is to make sure that object always lies inside canvas
     if (left + width >= maxWidth) {
@@ -40,7 +39,7 @@ const Cropper = () => {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<HTMLCanvasElement>(null);
   const FIRST_PAGE = 1;
-  const SCALE = 0.5;
+  const SCALE = 0.75;
 
   const loadPdf = async () => {
     if (!(file && pdfCanvasRef)) return;
@@ -94,6 +93,31 @@ const Cropper = () => {
         fabricCanvas.height as number
       )
     );
+
+    fabricCanvas.on("object:scaling", (e) => {
+      const rect = fabricCanvas.getActiveObject();
+
+      keepInCanvas(
+        e.target as fabric.Object,
+        fabricCanvas.width as number,
+        fabricCanvas.height as number
+      );
+
+      const left = rect?.left as number;
+      const top = rect?.top as number;
+      const width = rect?.getScaledWidth() as number;
+      const height = rect?.getScaledHeight() as number;
+
+      const [tx, ty] = viewPort.convertToPdfPoint(left, top);
+      const [bx, by] = viewPort.convertToPdfPoint(left + width, top + height);
+
+      // top left coordinates
+      console.log("topx, topy", tx, ty);
+      // bottom right coordinates
+      console.log("bx, by", bx, by);
+      const rectCoords = `[${tx} ${ty} ${bx} ${by}]`;
+      console.log("payload coords", rectCoords);
+    });
   };
 
   useEffect(() => {
